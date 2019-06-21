@@ -1,0 +1,5 @@
+sudo ./p37ec 0x12.4 0 && \
+sudo ./p37ec 0x08.6 0 && \
+sudo ./p37ec 0x13.0 1 && \
+sudo ./p37ec 0xb0 0x22 && \
+sudo ./p37ec 0xb1 0x22

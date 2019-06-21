@@ -20,6 +20,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
 SOFTWARE.
 */
+
 #include <endian.h>
 #include <math.h>
 #include <stdio.h>
@@ -50,7 +51,6 @@ unsigned char read1(FILE* f, unsigned char offset, unsigned char bit) {
 
 void write8(FILE* f, unsigned char offset, const unsigned char value) {
   fseek(f, offset, SEEK_SET);
-  unsigned char c = 0;
   fwrite(&value, sizeof(unsigned char), 1, f);
 }
 
@@ -79,27 +79,16 @@ void fail(const char* msg) {
   exit(1);
 }
 
-int main(int argc, char** args) {
-  FILE* ec = initEc();
-  if (!ec) fail("Unable to initialize embedded controller; did you forget to use sudo?");
+/**
+ * Show the usage for this application.
+ * 
+ * @param ec  the embedded controller file pointer
+ * @param args
+ */
+void showUsage(FILE *ec, char **args) {
 
-  if (argc == 3) {
-    char* dotIdx = strchr(args[1], '.');
-    if (dotIdx != NULL) {
-      *dotIdx = '\0';
-      dotIdx++;
-      unsigned char offset = (unsigned char)strtol(args[1], NULL, 0);
-      unsigned char bit = (unsigned char)atoi(dotIdx);
-      unsigned char value = (unsigned char)strtol(args[2], NULL, 0);
-      write1(ec, offset, bit, value);
-    } else {
-      unsigned char offset = (unsigned char)strtol(args[1], NULL, 0);
-      unsigned char value = (unsigned char)strtol(args[2], NULL, 0);
-      write8(ec, offset, value);
-    }
-  } else {
-    // Setting the following bits causing the EC to activate (or at least activate fan controls)
-    write8(ec, 0x01, 0xA3);
+
+    printf("Usage: sudo %s [<quicksetting>]\n", args[0]);
 
     printf("Usage: sudo %s [<hex-offset[.bit]> <hex-value>]\n", args[0]);
     printf("   Ex: sudo %s 0x01.6 0x07\n\n", args[0]);
@@ -125,7 +114,103 @@ int main(int argc, char** args) {
     printf("  Fan0 Custom Speed Setting   [0xB0]:   %d%%\n", (int)round(read8(ec, 0xB0) / 2.55));
     printf("  Fan1 Custom Speed Setting   [0xB1]:   %d%%\n", (int)round(read8(ec, 0xB1) / 2.55));
     printf("  Current Speed Setting       [0x64]:   %d\n", read8(ec, 0x64));
+
+}
+
+int executeQuickSettings(FILE *ec, char *command) {
+
+  if (strcmp(command, "silent") == 0) {
+    write1(ec, 0x13, 3, 1);   // enable fan control
+  
+    printf("Command: SILENT\n");
+    write1(ec, 0x12, 4, 0);   // disable gaming mode
+    write1(ec, 0x08, 6, 0);   // disable fan quiet mode
+    write1(ec, 0x13, 0, 1);   // enable custom mode
+
+    // basically disable both fans
+    write8(ec, 0x64, 0x0);   
+    write8(ec, 0xb0, 0x0);   
+    write8(ec, 0xb1, 0x0);
   }
+  else if (strcmp(command, "quiet") == 0) {
+  
+    printf("Command: QUIET\n");
+    write1(ec, 0x13, 3, 1);   // enable fan control
+    write1(ec, 0x08, 6, 1);   // fan quiet mode enabled
+    write1(ec, 0x12, 4, 0);   // disable gaming mode
+    write1(ec, 0x13, 0, 0);   // disable custom mode
+  }
+  else if (strcmp(command, "normal") == 0) {
+
+    printf("Command: NORMAL\n");
+    write1(ec, 0x13, 3, 1);   // enable fan control
+    write1(ec, 0x08, 6, 0);   // fan quiet mode enabled
+    write1(ec, 0x12, 4, 0);   // disable gaming mode
+    write1(ec, 0x13, 0, 0);   // disable custom mode
+
+  }
+  else if (strcmp(command, "gaming") == 0) {
+
+    printf("Command: GAMING\n");
+    write1(ec, 0x13, 3, 1);   // enable fan control
+    write1(ec, 0x08, 6, 0);   // disable quiet mode
+    write1(ec, 0x12, 4, 1);   // enable gaming mode
+    write1(ec, 0x13, 0, 0);   // disable custom mode
+
+  }  
+  else {
+    printf("Unknown command: '%s', expected: silent, quiet, normal, gaming\n", command);
+  }
+  return 0;
+}
+
+
+/**
+ * Execute the normal hex editing.
+ * 
+ * @param  ec     is the file pointer to drive
+ * @param  args   the arguments to operate on.
+ */
+void executeManualSetting(FILE *ec, char **args) {
+    char* dotIdx = strchr(args[1], '.');
+    if (dotIdx != NULL) {
+      *dotIdx = '\0';
+      dotIdx++;
+      unsigned char offset = (unsigned char)strtol(args[1], NULL, 0);
+      unsigned char bit = (unsigned char)atoi(dotIdx);
+      unsigned char value = (unsigned char)strtol(args[2], NULL, 0);
+      write1(ec, offset, bit, value);
+    } else {
+      unsigned char offset = (unsigned char)strtol(args[1], NULL, 0);
+      unsigned char value = (unsigned char)strtol(args[2], NULL, 0);
+      write8(ec, offset, value);
+    }
+}
+
+
+
+int main(int argc, char** args) {
+  FILE* ec = initEc();
+  if (!ec) {
+    fail("Unable to initialize embedded controller; did you forget to use sudo?");
+  }
+
+  // Setting the following bits causing the EC to activate (or at least activate fan controls)
+  write8(ec, 0x01, 0xA3);
+
+  if (argc != 3 && argc != 2) {
+    showUsage(ec, args);
+  } 
+  else if (argc == 2) {
+    executeQuickSettings(ec, args[1]);
+  }
+  else if (argc == 3) {
+    executeManualSetting(ec, args);  
+  }
+
+  // close file pointer to embedded controller.
   closeEc(ec);
-  exit(0);
+
+  // Exit success
+  exit(EXIT_SUCCESS);
 }
