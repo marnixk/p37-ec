@@ -69,10 +69,11 @@ void keepQuietAlgorithm(FILE *ec) {
 
 	unsigned int idx = 0;
 	unsigned int highFor = 0;
-	unsigned int stepSizeMs = 100;
-	unsigned int reduceAfter = 5;
-	unsigned int minimiseAfter = 2;
+	unsigned int stepSizeMs = 200;
+	unsigned int reduceAfter = 10;
+	unsigned int minimiseAfter = 5;
 	unsigned int reduceIfUnderTemp = 70;
+	unsigned int fanThreshold = 5000;
 	
 	printf("\e[2J\e[H"); 
 
@@ -106,13 +107,13 @@ void keepQuietAlgorithm(FILE *ec) {
 			highFor = 0;
 		}
 		// half way? let's reduce the speed.
-		else if (totalSpeed > 3000 && cpuTemp < reduceIfUnderTemp && highFor == minimiseAfter) {
+		else if (totalSpeed > fanThreshold && cpuTemp < reduceIfUnderTemp && highFor == minimiseAfter) {
 			progChar = '*';
 			executeQuickSettings(ec, "reduced", 0);
 			++highFor;
 		}
 		// end game? let's turn them back off
-		else if (totalSpeed > 3000 && cpuTemp < reduceIfUnderTemp && highFor >= reduceAfter) {
+		else if (totalSpeed > fanThreshold && cpuTemp < reduceIfUnderTemp && highFor >= reduceAfter) {
 			// adjusting.
 			highFor = 0;
 			progChar = '*';
@@ -126,7 +127,7 @@ void keepQuietAlgorithm(FILE *ec) {
 		}
 
 		// want to make sure we're counting this as a busy period
-		else if (totalSpeed > 3000) {
+		else if (totalSpeed > fanThreshold) {
 			++highFor;
 		}
 
